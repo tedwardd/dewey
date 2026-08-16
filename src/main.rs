@@ -31,7 +31,7 @@ fn run(cli: cli::Cli) -> Result<(), CliError> {
     let mods_dir = config::modules_dir()?;
     let entries = discovery::discover(&mods_dir);
     match cli.cmd {
-        cli::Command::Modules => print_entries(&entries),
+        cli::Command::Libraries => print_entries(&entries),
         cli::Command::Install { module_dir, force } => {
             install_module(&module_dir, &mods_dir, force)?
         }

@@ -23,7 +23,7 @@ library-cli install ./modules/standard-ebooks
 ## Usage
 
 ```bash
-library-cli modules                       # list installed modules
+library-cli libraries                     # list available libraries
 library-cli search "moby dick" --module gutenberg
 library-cli categories --module standard-ebooks
 library-cli list --category <feed-url> --module standard-ebooks

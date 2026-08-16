@@ -10,8 +10,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// List installed modules and their capabilities
-    Modules,
+    /// List available libraries (modules) and their capabilities
+    Libraries,
     /// Install a module from a directory into the discovery path
     Install {
         /// Path to the module directory (must contain manifest.toml)

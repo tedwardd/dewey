@@ -174,15 +174,25 @@ fn no_module_selected_is_usage_error() {
 }
 
 #[test]
-fn modules_lists_entries_and_broken() {
+fn libraries_lists_entries_and_broken() {
     let out = bin()
         .env("LIBRARY_CLI_MODULES", fixtures())
-        .arg("modules")
+        .arg("libraries")
         .output()
         .unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("fake v0.1.0"), "got: {text}");
     assert!(text.contains("BROKEN"), "got: {text}");
+}
+
+#[test]
+fn modules_verb_removed_is_usage_error() {
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", fixtures())
+        .arg("modules")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
 }
 
 #[test]

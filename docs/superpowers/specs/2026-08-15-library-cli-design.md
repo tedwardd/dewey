@@ -168,7 +168,7 @@ as the `category` param to `list`.
 ## CLI surface
 
 ```
-library-cli modules                        list installed modules + capabilities
+library-cli libraries                     list available libraries + capabilities
 library-cli install <module-dir>           copy module into discovery path
 library-cli search <query> [--module m] [--limit N] [--json]
 library-cli categories [--module m]
