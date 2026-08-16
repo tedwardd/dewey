@@ -175,6 +175,12 @@ fn install_module(module_dir: &std::path::Path, mods_dir: &std::path::Path, forc
     }
     std::fs::create_dir_all(mods_dir)
         .map_err(|e| CliError::Network(format!("cannot create {}: {e}", mods_dir.display())))?;
+    if target.exists() {
+        // force is implied here (non-force already returned above): clean the
+        // target so the reinstall exactly mirrors the source, no stale files.
+        std::fs::remove_dir_all(&target)
+            .map_err(|e| CliError::Network(format!("cannot remove {}: {e}", target.display())))?;
+    }
     copy_dir(module_dir, &target)?;
     println!("installed module {} from {}", manifest.name, module_dir.display());
     Ok(())
