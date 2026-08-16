@@ -29,17 +29,14 @@ pub fn sanitize_component(s: &str) -> String {
 }
 
 pub fn download_filename(book: &Book, format: &str) -> String {
+    let title = sanitize_component(&book.title);
+    let title = if title.is_empty() { "untitled".to_string() } else { title };
     let author = if book.authors.is_empty() {
         String::new()
     } else {
-        format!(" - {}", book.authors.join(", "))
+        format!(" - {}", sanitize_component(&book.authors.join(", ")))
     };
-    format!(
-        "{}{}.{}",
-        sanitize_component(&book.title),
-        author,
-        extension_for(format)
-    )
+    format!("{title}{author}.{}", extension_for(format))
 }
 
 pub fn resolve_dest(dir: &Path, filename: &str, force: bool) -> Result<PathBuf, CliError> {
@@ -56,6 +53,7 @@ pub fn resolve_dest(dir: &Path, filename: &str, force: bool) -> Result<PathBuf, 
 enum FetchError {
     Status(u16),
     Transport(String),
+    Body(String),
     Io(std::io::Error),
 }
 
@@ -80,11 +78,20 @@ fn fetch_once(url: &str, dest: &Path) -> Result<u64, FetchError> {
     let mut buf = [0u8; 64 * 1024];
     let mut written: u64 = 0;
     loop {
-        let n = reader.read(&mut buf).map_err(FetchError::Io)?;
+        let n = reader.read(&mut buf).map_err(|e| {
+            // Body read failures (truncated response, connection reset) are transient:
+            // drop the partial file and let the caller retry.
+            let _ = fs::remove_file(dest);
+            FetchError::Body(e.to_string())
+        })?;
         if n == 0 {
             break;
         }
-        file.write_all(&buf[..n]).map_err(FetchError::Io)?;
+        file.write_all(&buf[..n]).map_err(|e| {
+            // Disk errors are not transient, but never leave a partial file behind.
+            let _ = fs::remove_file(dest);
+            FetchError::Io(e)
+        })?;
         written += n as u64;
         if show_progress {
             pb.set_position(written);
@@ -113,6 +120,12 @@ pub fn fetch_to_file(url: &str, dest: &Path) -> Result<u64, CliError> {
             Err(FetchError::Transport(t)) => {
                 return Err(CliError::Network(format!("transport error: {t}")));
             }
+            Err(FetchError::Body(e)) if attempt == 0 => {
+                last = Some(CliError::Network(format!("body read error (retrying): {e}")));
+            }
+            Err(FetchError::Body(e)) => {
+                return Err(CliError::Network(format!("body read error: {e}")));
+            }
             Err(FetchError::Io(e)) => return Err(CliError::Network(format!("write error: {e}"))),
         }
     }
@@ -136,17 +149,19 @@ mod tests {
         dir
     }
 
-    fn spawn_http(responses: Vec<(&'static str, &'static [u8])>) -> (String, thread::JoinHandle<()>) {
+    fn spawn_http(
+        responses: Vec<(&'static str, &'static [u8], Option<usize>)>,
+    ) -> (String, thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://127.0.0.1:{}/b.epub", listener.local_addr().unwrap().port());
         let handle = thread::spawn(move || {
-            for (status_line, body) in responses {
+            for (status_line, body, declared_len) in responses {
                 let (mut stream, _) = listener.accept().unwrap();
                 let mut buf = [0u8; 4096];
                 let _ = stream.read(&mut buf);
                 let head = format!(
                     "HTTP/1.1 {status_line}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
+                    declared_len.unwrap_or(body.len())
                 );
                 stream.write_all(head.as_bytes()).unwrap();
                 stream.write_all(body).unwrap();
@@ -171,7 +186,7 @@ mod tests {
     #[test]
     fn fetch_success_writes_file() {
         let dir = temp_dir();
-        let (url, handle) = spawn_http(vec![("200 OK", b"hello epub")]);
+        let (url, handle) = spawn_http(vec![("200 OK", b"hello epub", None)]);
         let dest = dir.join("out.epub");
         let n = fetch_to_file(&url, &dest).unwrap();
         assert_eq!(n, 10);
@@ -182,7 +197,8 @@ mod tests {
     #[test]
     fn fetch_retries_once_on_5xx() {
         let dir = temp_dir();
-        let (url, handle) = spawn_http(vec![("503 Service Unavailable", b""), ("200 OK", b"data")]);
+        let (url, handle) =
+            spawn_http(vec![("503 Service Unavailable", b"", None), ("200 OK", b"data", None)]);
         let dest = dir.join("out.epub");
         let n = fetch_to_file(&url, &dest).unwrap();
         assert_eq!(n, 4);
@@ -193,11 +209,38 @@ mod tests {
     #[test]
     fn fetch_does_not_retry_404() {
         let dir = temp_dir();
-        let (url, handle) = spawn_http(vec![("404 Not Found", b"")]);
+        let (url, handle) = spawn_http(vec![("404 Not Found", b"", None)]);
         let dest = dir.join("out.epub");
         let err = fetch_to_file(&url, &dest).unwrap_err();
         assert_eq!(err.exit_code(), 3);
         assert!(err.to_string().contains("404"), "got: {err}");
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn fetch_retries_truncated_body_then_succeeds() {
+        let dir = temp_dir();
+        // First response declares Content-Length 10 but sends only 3 bytes and closes
+        // (truncated body); second response is a complete 200 with b"data".
+        let (url, handle) = spawn_http(vec![("200 OK", b"dat", Some(10)), ("200 OK", b"data", None)]);
+        let dest = dir.join("out.epub");
+        let n = fetch_to_file(&url, &dest).unwrap();
+        assert_eq!(n, 4);
+        assert_eq!(fs::read(&dest).unwrap(), b"data");
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn fetch_truncated_body_twice_fails_and_leaves_no_partial() {
+        let dir = temp_dir();
+        // Both responses are truncated: the retry must fail and the destination
+        // file (created then partially written) must be removed.
+        let (url, handle) =
+            spawn_http(vec![("200 OK", b"dat", Some(10)), ("200 OK", b"da", Some(10))]);
+        let dest = dir.join("out.epub");
+        let err = fetch_to_file(&url, &dest).unwrap_err();
+        assert_eq!(err.exit_code(), 3);
+        assert!(!dest.exists(), "partial file must be removed, got: {}", dest.display());
         handle.join().unwrap();
     }
 
@@ -237,5 +280,22 @@ mod tests {
         assert_eq!(sanitize_component("A/B:C*"), "A-B-C-");
         assert_eq!(sanitize_component("  a   b  "), "a b");
         assert_eq!(sanitize_component("Moby Dick; Or, The Whale"), "Moby Dick; Or, The Whale");
+    }
+
+    #[test]
+    fn filename_sanitizes_author_segment() {
+        assert_eq!(
+            download_filename(&book("T", &["AC/DC"]), "epub"),
+            "T - AC-DC.epub"
+        );
+    }
+
+    #[test]
+    fn filename_falls_back_to_untitled_for_empty_title() {
+        assert_eq!(download_filename(&book("", &[]), "epub"), "untitled.epub");
+        assert_eq!(
+            download_filename(&book("", &["Author"]), "epub"),
+            "untitled - Author.epub"
+        );
     }
 }
