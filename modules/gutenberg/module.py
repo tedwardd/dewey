@@ -47,7 +47,9 @@ def load(method, key, url):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     try:
-        with urllib.request.urlopen(url, timeout=30) as resp:
+        # gutendex rejects the default urllib user agent (HTTP 403).
+        req = urllib.request.Request(url, headers={"User-Agent": "library-cli/0.1"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"gutendex http {e.code}: {url}") from e

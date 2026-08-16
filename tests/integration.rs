@@ -446,3 +446,95 @@ fn standard_ebooks_show_book_html_fallback() {
         "https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.epub"
     );
 }
+
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::thread;
+
+// End-to-end: gutenberg module (fixture) returns a download URL pointing at
+// a local server; the host must fetch and write the file.
+#[test]
+fn gutenberg_download_end_to_end() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let body = b"PK\x03\x04 fake epub bytes".to_vec();
+    let server_body = body.clone();
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buf = [0u8; 4096];
+        let _ = stream.read(&mut buf);
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            server_body.len()
+        );
+        stream.write_all(head.as_bytes()).unwrap();
+        stream.write_all(&server_body).unwrap();
+    });
+
+    // Fixture override: point the book's txt URL at the local server.
+    let tmp = std::env::temp_dir().join(format!(
+        "libcli-e2e-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let mut fixture: serde_json::Value =
+        serde_json::from_str(include_str!("../modules/gutenberg/fixtures/book-2701.json")).unwrap();
+    fixture["formats"]["text/plain; charset=us-ascii"] =
+        serde_json::Value::String(format!("http://127.0.0.1:{port}/2701.txt.utf-8"));
+    std::fs::write(
+        tmp.join("book-2701.json"),
+        serde_json::to_string(&fixture).unwrap(),
+    )
+    .unwrap();
+
+    let out_dir = tmp.join("out");
+    std::fs::create_dir_all(&out_dir).unwrap();
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env("LIBRARY_CLI_FIXTURE", &tmp)
+        .args([
+            "download", "2701", "--format", "txt", "--module", "gutenberg",
+            "--dir", out_dir.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("downloaded 20 bytes"), "got: {text}");
+    let saved = out_dir.join("Moby Dick; Or, The Whale - Melville, Herman.txt");
+    assert!(saved.exists(), "missing {saved:?}");
+    assert_eq!(std::fs::read(&saved).unwrap(), body);
+    handle.join().unwrap();
+}
+
+// Live tests: opt in with `cargo test -- --ignored`. Requires network.
+#[test]
+#[ignore = "live network test"]
+fn gutenberg_search_live() {
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env_remove("LIBRARY_CLI_FIXTURE")
+        .args(["search", "moby dick", "--module", "gutenberg", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(parsed.as_array().unwrap().iter().any(|b| b["title"].as_str().unwrap_or("").contains("Moby Dick")));
+}
+
+#[test]
+#[ignore = "live network test"]
+fn standard_ebooks_categories_live() {
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env_remove("LIBRARY_CLI_FIXTURE")
+        .args(["categories", "--module", "standard-ebooks"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("New Releases"));
+}

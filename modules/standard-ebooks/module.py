@@ -22,6 +22,9 @@ ROOT = "https://standardebooks.org/feeds/opds"
 # Live feeds (2026): the OPDS search endpoint lives on the root URL with
 # OpenSearch parameters; category feeds require Patrons Circle auth.
 SEARCH_TEMPLATE = ROOT + "/all?query={searchTerms}&per-page={perPage}&page=1"
+# Public New Releases Atom feed, used as the fallback category when the OPDS
+# catalog is patron-gated.
+ATOM_NEW_RELEASES = "https://standardebooks.org/feeds/atom/new-releases"
 
 MIME_TO_FORMAT = {
     "application/epub+zip": "epub",
@@ -116,14 +119,24 @@ def to_book(entry):
 
 
 def categories():
-    feed = load_xml("categories", "", ROOT + "/all")
-    cats = []
-    for entry in feed.findall(ATOM + "entry"):
-        title = text_of(entry, ATOM + "title")
-        for link in entry.findall(ATOM + "link"):
-            if link.get("rel") == "subsection":
-                cats.append({"id": link.get("href", ""), "title": title})
-    return {"categories": cats}
+    try:
+        feed = load_xml("categories", "", ROOT + "/all")
+    except RuntimeError as e:
+        if "http 401" not in str(e):
+            raise
+        feed = None
+    if feed is not None:
+        cats = []
+        for entry in feed.findall(ATOM + "entry"):
+            title = text_of(entry, ATOM + "title")
+            for link in entry.findall(ATOM + "link"):
+                if link.get("rel") == "subsection":
+                    cats.append({"id": link.get("href", ""), "title": title})
+        if cats:
+            return {"categories": cats}
+    # Live (2026): the OPDS catalog now requires Patrons Circle auth (HTTP
+    # 401); the New Releases Atom feed is public, so offer it as a category.
+    return {"categories": [{"id": ATOM_NEW_RELEASES, "title": "New Releases"}]}
 
 
 def list_books(params):
