@@ -1,0 +1,5 @@
+name = "fake"
+version = "0.1.0"
+description = "Deterministic fake module for tests"
+command = ["python3", "module.py"]
+capabilities = ["search", "categories", "list", "book"]

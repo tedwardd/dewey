@@ -1,5 +1,6 @@
 mod book;
 mod config;
+mod discovery;
 mod errors;
 mod module;
 

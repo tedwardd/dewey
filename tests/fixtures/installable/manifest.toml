@@ -1,0 +1,5 @@
+name = "installable"
+version = "0.1.0"
+description = "Module used to test install"
+command = ["python3", "module.py"]
+capabilities = ["search"]

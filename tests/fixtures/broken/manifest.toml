@@ -1,0 +1,4 @@
+name = "broken"
+version = "0.1.0"
+command = ["python3", "module.py"]
+capabilities = []
