@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const CONFIG_DIR_NAME: &str = "library-cli";
+pub const CONFIG_DIR_NAME: &str = "dewey";
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
@@ -24,9 +24,9 @@ pub fn config_dir() -> Result<PathBuf, CliError> {
 }
 
 pub fn modules_dir() -> Result<PathBuf, CliError> {
-    if let Some(dir) = std::env::var_os("LIBRARY_CLI_MODULES") {
+    if let Some(dir) = std::env::var_os("DEWEY_MODULES") {
         if dir.is_empty() {
-            return Err(CliError::Config("LIBRARY_CLI_MODULES is empty".into()));
+            return Err(CliError::Config("DEWEY_MODULES is empty".into()));
         }
         return Ok(PathBuf::from(dir));
     }
@@ -77,7 +77,7 @@ mod tests {
 
     fn temp_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
-            "libcli-config-{}-{}",
+            "dewey-config-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

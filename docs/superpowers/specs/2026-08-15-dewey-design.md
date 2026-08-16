@@ -1,12 +1,12 @@
-# library-cli — Design
+# dewey — Design
 
 Date: 2026-08-15
 Status: Approved (pending written review)
-Working name: `library-cli` (final name TBD)
+Name: `dewey` — named for the Dewey Decimal System
 
 ## Overview
 
-`library-cli` is a command-line framework for accessing open ebook libraries.
+`dewey` is a command-line framework for accessing open ebook libraries.
 A Rust host binary provides the verbs (search, browse, download); each
 library is accessed through a *module* — an independent program, written in
 any language (reference modules use Python 3 stdlib-only), that the host
@@ -39,15 +39,15 @@ authentication.
 ## Architecture
 
 ```
-library-cli (Rust binary)
+dewey (Rust binary)
  ├─ cli layer      — clap subcommands, output formatting
  ├─ discovery      — scan module dirs, load + validate manifests
  ├─ module host    — spawn module, NDJSON/JSON-RPC transport, timeout
  └─ downloader     — fetch URL from a Book's format map, progress bar
 ```
 
-Module discovery path: `~/.config/library-cli/modules/<name>/`
-(overridable via `LIBRARY_CLI_MODULES` env var, which supports one directory;
+Module discovery path: `~/.config/dewey/modules/<name>/`
+(overridable via `DEWEY_MODULES` env var, which supports one directory;
 the repo's `modules/` dir is exercised this way in development).
 Each module dir contains a `manifest.toml` and the module's code.
 
@@ -168,13 +168,13 @@ as the `category` param to `list`.
 ## CLI surface
 
 ```
-library-cli libraries                     list available libraries + capabilities
-library-cli install <module-dir>           copy module into discovery path
-library-cli search <query> [--module m] [--limit N] [--json]
-library-cli categories [--module m]
-library-cli list --category C [--module m] [--limit N]
-library-cli show <book-id> [--module m]
-library-cli download <book-id> --format F [--module m] [-o DIR] [--force]
+dewey libraries                     list available libraries + capabilities
+dewey install <module-dir>           copy module into discovery path
+dewey search <query> [--module m] [--limit N] [--json]
+dewey categories [--module m]
+dewey list --category C [--module m] [--limit N]
+dewey show <book-id> [--module m]
+dewey download <book-id> --format F [--module m] [-o DIR] [--force]
 ```
 
 - Module resolution order: `--module` flag → `default_module` in config →
@@ -198,7 +198,7 @@ library-cli download <book-id> --format F [--module m] [-o DIR] [--force]
 
 ## Config
 
-`~/.config/library-cli/config.toml` (optional; TOML):
+`~/.config/dewey/config.toml` (optional; TOML):
 
 ```toml
 default_module = "gutenberg"
@@ -230,7 +230,7 @@ download_dir = "~/Downloads"
   sanitization, format-tag → extension mapping, exit-code mapping, config
   parsing.
 - **Fixture-based integration tests (default CI)**: each module supports a
-  fixture mode via `LIBRARY_CLI_FIXTURE=<fixture-dir>` env var — when set, the
+  fixture mode via `DEWEY_FIXTURE=<fixture-dir>` env var — when set, the
   module answers from recorded upstream responses (scenario files keyed by
   method + params, e.g. `search-dune.json`) instead of the network. Tests
   spawn the real module binaries and drive them through the real host code,
@@ -264,7 +264,7 @@ modules/
   standard-ebooks/    manifest.toml, module.py, fixtures/
 tests/
   integration.rs      spawns real modules (fixture mode) + download TcpListener
-docs/superpowers/specs/2026-08-15-library-cli-design.md
+docs/superpowers/specs/2026-08-15-dewey-design.md
 ```
 
 ## Reference modules

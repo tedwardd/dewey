@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "library-cli", version, about = "Access open ebook libraries through pluggable modules")]
+#[command(name = "dewey", version, about = "Access open ebook libraries through pluggable modules")]
 pub struct Cli {
     #[command(subcommand)]
     pub cmd: Command,

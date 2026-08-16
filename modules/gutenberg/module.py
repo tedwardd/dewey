@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Project Gutenberg module for library-cli.
+"""Project Gutenberg module for dewey.
 
 Speaks JSON-RPC 2.0 (one JSON object per line) over stdio.
-When LIBRARY_CLI_FIXTURE is set, answers from recorded gutendex JSON files
+When DEWEY_FIXTURE is set, answers from recorded gutendex JSON files
 (<fixture>/search-<slug>.json, <fixture>/book-<id>.json) instead of the network.
 """
 import http.client
@@ -33,7 +33,7 @@ def key_for(s):
 
 
 def fixture_path(method, key):
-    root = os.environ.get("LIBRARY_CLI_FIXTURE")
+    root = os.environ.get("DEWEY_FIXTURE")
     if not root:
         return None
     k = slug(key) if key else ""
@@ -49,7 +49,7 @@ def load(method, key, url):
             return json.load(f)
     try:
         # gutendex rejects the default urllib user agent (HTTP 403).
-        req = urllib.request.Request(url, headers={"User-Agent": "library-cli/0.1"})
+        req = urllib.request.Request(url, headers={"User-Agent": "dewey/0.1"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:

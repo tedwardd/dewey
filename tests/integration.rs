@@ -7,7 +7,7 @@ static INSTALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn unique_target_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "libcli-install-{}-{}",
+        "dewey-install-{}-{}",
         std::process::id(),
         INSTALL_COUNTER.fetch_add(1, Ordering::SeqCst)
     ));
@@ -16,18 +16,18 @@ fn unique_target_dir() -> PathBuf {
 }
 
 /// Lazily-created temp HOME so tests never read the developer's real
-/// `$HOME/.config/library-cli/config.toml`. A real config with a
+/// `$HOME/.config/dewey/config.toml`. A real config with a
 /// `default_module` would flip `no_module_selected_is_usage_error` to exit 0,
 /// and a malformed one would make every invocation exit 4.
 /// A static (not `set_var`) keeps this race-free with parallel tests.
 static HOME_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    let dir = std::env::temp_dir().join(format!("libcli-test-home-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("dewey-test-home-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("create test HOME dir");
     dir
 });
 
 fn bin() -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_library-cli"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_dewey"));
     cmd.env("HOME", &*HOME_DIR);
     cmd
 }
@@ -38,7 +38,7 @@ fn fixtures() -> PathBuf {
 
 fn run_search_table() -> String {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["search", "fake", "--module", "fake", "--limit", "5"])
         .output()
         .unwrap();
@@ -56,7 +56,7 @@ fn search_renders_table() {
 #[test]
 fn search_json_output() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["search", "fake", "--module", "fake", "--json"])
         .output()
         .unwrap();
@@ -69,7 +69,7 @@ fn search_json_output() {
 #[test]
 fn categories_renders() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["categories", "--module", "fake"])
         .output()
         .unwrap();
@@ -80,7 +80,7 @@ fn categories_renders() {
 #[test]
 fn show_renders_book() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["show", "1", "--module", "fake"])
         .output()
         .unwrap();
@@ -91,7 +91,7 @@ fn show_renders_book() {
 #[test]
 fn list_requires_category() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["list", "--module", "fake"])
         .output()
         .unwrap();
@@ -101,7 +101,7 @@ fn list_requires_category() {
 #[test]
 fn download_unreachable_url_is_network_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["download", "1", "--format", "epub", "--module", "fake"])
         .output()
         .unwrap();
@@ -110,10 +110,10 @@ fn download_unreachable_url_is_network_error() {
 
 #[test]
 fn download_short_o_flag_parses() {
-    let tmp = std::env::temp_dir().join(format!("libcli-o-flag-{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("dewey-o-flag-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["download", "1", "--format", "epub", "--module", "fake", "-o", tmp.to_str().unwrap()])
         .output()
         .unwrap();
@@ -125,7 +125,7 @@ fn download_short_o_flag_parses() {
 #[test]
 fn download_unknown_format_is_usage_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["download", "1", "--format", "pdf", "--module", "fake"])
         .output()
         .unwrap();
@@ -136,7 +136,7 @@ fn download_unknown_format_is_usage_error() {
 #[test]
 fn unknown_module_is_usage_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["search", "x", "--module", "nope"])
         .output()
         .unwrap();
@@ -146,7 +146,7 @@ fn unknown_module_is_usage_error() {
 #[test]
 fn empty_query_is_usage_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["search", "", "--module", "fake"])
         .output()
         .unwrap();
@@ -156,7 +156,7 @@ fn empty_query_is_usage_error() {
 #[test]
 fn broken_module_is_config_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["search", "x", "--module", "broken"])
         .output()
         .unwrap();
@@ -166,7 +166,7 @@ fn broken_module_is_config_error() {
 #[test]
 fn no_module_selected_is_usage_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .args(["search", "x"])
         .output()
         .unwrap();
@@ -176,7 +176,7 @@ fn no_module_selected_is_usage_error() {
 #[test]
 fn libraries_lists_entries_and_broken() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .arg("libraries")
         .output()
         .unwrap();
@@ -188,7 +188,7 @@ fn libraries_lists_entries_and_broken() {
 #[test]
 fn modules_verb_removed_is_usage_error() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", fixtures())
+        .env("DEWEY_MODULES", fixtures())
         .arg("modules")
         .output()
         .unwrap();
@@ -197,13 +197,13 @@ fn modules_verb_removed_is_usage_error() {
 
 #[test]
 fn install_force_removes_stale_files() {
-    let mods_dir = std::env::temp_dir().join(format!("libcli-test-mods-{}", std::process::id()));
+    let mods_dir = std::env::temp_dir().join(format!("dewey-test-mods-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&mods_dir);
     let src = fixtures().join("installable");
 
     // First install into a fresh target dir.
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", &mods_dir)
+        .env("DEWEY_MODULES", &mods_dir)
         .args(["install", src.to_str().unwrap()])
         .output()
         .unwrap();
@@ -216,7 +216,7 @@ fn install_force_removes_stale_files() {
 
     // Forced reinstall must mirror the source exactly: stale file gone.
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", &mods_dir)
+        .env("DEWEY_MODULES", &mods_dir)
         .args(["install", src.to_str().unwrap(), "--force"])
         .output()
         .unwrap();
@@ -232,7 +232,7 @@ fn install_copies_module_into_discovery_path() {
     let target = unique_target_dir();
     let source = fixtures().join("installable");
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", &target)
+        .env("DEWEY_MODULES", &target)
         .args(["install", source.to_str().unwrap()])
         .output()
         .unwrap();
@@ -241,7 +241,7 @@ fn install_copies_module_into_discovery_path() {
     assert!(target.join("installable/module.py").exists());
     // Installed module is discoverable and runnable.
     let search = bin()
-        .env("LIBRARY_CLI_MODULES", &target)
+        .env("DEWEY_MODULES", &target)
         .args(["search", "x", "--module", "installable"])
         .output()
         .unwrap();
@@ -253,20 +253,20 @@ fn install_refuses_overwrite_without_force() {
     let target = unique_target_dir();
     let source = fixtures().join("installable");
     let first = bin()
-        .env("LIBRARY_CLI_MODULES", &target)
+        .env("DEWEY_MODULES", &target)
         .args(["install", source.to_str().unwrap()])
         .output()
         .unwrap();
     assert!(first.status.success());
     let second = bin()
-        .env("LIBRARY_CLI_MODULES", &target)
+        .env("DEWEY_MODULES", &target)
         .args(["install", source.to_str().unwrap()])
         .output()
         .unwrap();
     assert_eq!(second.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&second.stderr).contains("--force"));
     let third = bin()
-        .env("LIBRARY_CLI_MODULES", &target)
+        .env("DEWEY_MODULES", &target)
         .args(["install", "--force", source.to_str().unwrap()])
         .output()
         .unwrap();
@@ -297,8 +297,8 @@ fn gutenberg_fixtures() -> PathBuf {
 #[test]
 fn gutenberg_search_json_against_fixtures() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .env("DEWEY_MODULES", repo_modules())
+        .env("DEWEY_FIXTURE", gutenberg_fixtures())
         .args(["search", "moby dick", "--module", "gutenberg", "--json"])
         .output()
         .unwrap();
@@ -320,8 +320,8 @@ fn gutenberg_search_json_against_fixtures() {
 #[test]
 fn gutenberg_search_table_against_fixtures() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .env("DEWEY_MODULES", repo_modules())
+        .env("DEWEY_FIXTURE", gutenberg_fixtures())
         .args(["search", "moby dick", "--module", "gutenberg"])
         .output()
         .unwrap();
@@ -332,10 +332,25 @@ fn gutenberg_search_table_against_fixtures() {
 }
 
 #[test]
+fn relative_modules_dir_resolves_commands() {
+    // A relative DEWEY_MODULES must still spawn modules correctly (module
+    // dirs are canonicalized at discovery time, so script args are absolute).
+    let out = bin()
+        .current_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR")))
+        .env("DEWEY_MODULES", "modules")
+        .env("DEWEY_FIXTURE", gutenberg_fixtures())
+        .args(["search", "moby dick", "--module", "gutenberg"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Moby Dick; Or, The Whale"));
+}
+
+#[test]
 fn gutenberg_show_against_fixtures() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .env("DEWEY_MODULES", repo_modules())
+        .env("DEWEY_FIXTURE", gutenberg_fixtures())
         .args(["show", "2701", "--module", "gutenberg"])
         .output()
         .unwrap();
@@ -348,8 +363,8 @@ fn categories_rejected_when_module_lacks_capability() {
     // gutenberg declares only ["search", "book"]; the host must refuse
     // `categories` before spawning the module.
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .env("DEWEY_MODULES", repo_modules())
+        .env("DEWEY_FIXTURE", gutenberg_fixtures())
         .args(["categories", "--module", "gutenberg"])
         .output()
         .unwrap();
@@ -365,8 +380,8 @@ fn se_fixtures() -> PathBuf {
 
 fn se_bin() -> Command {
     let mut c = bin();
-    c.env("LIBRARY_CLI_MODULES", repo_modules());
-    c.env("LIBRARY_CLI_FIXTURE", se_fixtures());
+    c.env("DEWEY_MODULES", repo_modules());
+    c.env("DEWEY_FIXTURE", se_fixtures());
     c
 }
 
@@ -455,7 +470,7 @@ fn standard_ebooks_show_book_html_fallback() {
     let mut child = Command::new("python3")
         .arg(repo_modules().join("standard-ebooks/module.py"))
         .current_dir(repo_modules().join("standard-ebooks"))
-        .env("LIBRARY_CLI_FIXTURE", se_fixtures())
+        .env("DEWEY_FIXTURE", se_fixtures())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .spawn()
@@ -513,7 +528,7 @@ fn gutenberg_download_end_to_end() {
 
     // Fixture override: point the book's txt URL at the local server.
     let tmp = std::env::temp_dir().join(format!(
-        "libcli-e2e-{}-{}",
+        "dewey-e2e-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -534,8 +549,8 @@ fn gutenberg_download_end_to_end() {
     let out_dir = tmp.join("out");
     std::fs::create_dir_all(&out_dir).unwrap();
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env("LIBRARY_CLI_FIXTURE", &tmp)
+        .env("DEWEY_MODULES", repo_modules())
+        .env("DEWEY_FIXTURE", &tmp)
         .args([
             "download", "2701", "--format", "txt", "--module", "gutenberg",
             "--dir", out_dir.to_str().unwrap(),
@@ -556,8 +571,8 @@ fn gutenberg_download_end_to_end() {
 #[ignore = "live network test"]
 fn gutenberg_search_live() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env_remove("LIBRARY_CLI_FIXTURE")
+        .env("DEWEY_MODULES", repo_modules())
+        .env_remove("DEWEY_FIXTURE")
         .args(["search", "moby dick", "--module", "gutenberg", "--json"])
         .output()
         .unwrap();
@@ -570,8 +585,8 @@ fn gutenberg_search_live() {
 #[ignore = "live network test"]
 fn standard_ebooks_categories_live() {
     let out = bin()
-        .env("LIBRARY_CLI_MODULES", repo_modules())
-        .env_remove("LIBRARY_CLI_FIXTURE")
+        .env("DEWEY_MODULES", repo_modules())
+        .env_remove("DEWEY_FIXTURE")
         .args(["categories", "--module", "standard-ebooks"])
         .output()
         .unwrap();

@@ -35,16 +35,21 @@ pub fn discover(dir: &Path) -> Vec<ModuleEntry> {
             continue;
         }
         let name = e.file_name().to_string_lossy().into_owned();
-        match load_manifest(&e.path()) {
+        // Canonicalize so command args resolve absolutely regardless of how
+        // the modules dir was spelled (a relative DEWEY_MODULES would
+        // otherwise leave relative script paths that the child resolves
+        // against its own cwd).
+        let dir = fs::canonicalize(e.path()).unwrap_or_else(|_| e.path());
+        match load_manifest(&dir) {
             Ok(m) => out.push(ModuleEntry {
                 name,
-                dir: e.path(),
+                dir,
                 manifest: Some(m),
                 error: None,
             }),
             Err(err) => out.push(ModuleEntry {
                 name,
-                dir: e.path(),
+                dir,
                 manifest: None,
                 error: Some(err),
             }),

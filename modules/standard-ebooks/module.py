@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Standard Ebooks module for library-cli.
+"""Standard Ebooks module for dewey.
 
 Speaks JSON-RPC 2.0 (one JSON object per line) over stdio.
-When LIBRARY_CLI_FIXTURE is set, answers from recorded files
+When DEWEY_FIXTURE is set, answers from recorded files
 (<fixture>/<method>-<slug>.json) instead of the network.
 """
 import html.parser
@@ -54,7 +54,7 @@ def key_for(s):
 
 
 def fixture_path(method, key):
-    root = os.environ.get("LIBRARY_CLI_FIXTURE")
+    root = os.environ.get("DEWEY_FIXTURE")
     if not root:
         return None
     k = slug(key) if key else ""

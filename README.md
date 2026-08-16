@@ -1,62 +1,126 @@
-# library-cli
+# dewey
 
-Access open ebook libraries from the command line. The core is a small Rust
-binary; each library is a *module* — a standalone program (any language) that
-speaks JSON-RPC over stdio and returns normalized book records.
+*Access open ebook libraries from your terminal.*
 
-## Build & run
+`dewey` is a command-line framework for open ebook libraries, named for the
+Dewey Decimal System. A small Rust core talks to *modules* — one per library —
+over a simple JSON-RPC protocol, so every library is accessed the same way:
+search, browse, inspect, download.
 
-Requires Rust and `python3` (>= 3.8).
+It ships with modules for **Project Gutenberg** and **Standard Ebooks**, and
+any library can be added by writing a module — see
+[Developing library modules](docs/module-development.md).
+
+## Features
+
+- **Pluggable libraries.** Each library is a standalone program (Python,
+  Lua, anything that speaks JSON over stdio) declaring what it can do. No
+  core changes are needed to add a library.
+- **Uniform access.** `search`, `categories`, `list`, `show`, and `download`
+  behave the same across every library.
+- **Host-owned downloads.** Progress bars, retries on transient failures,
+  sanitized filenames, and an overwrite guard — one code path for all
+  libraries.
+- **Offline testing.** Modules can answer from recorded data via
+  `DEWEY_FIXTURE`, so the test suite is hermetic and modules are easy to
+  develop without a network.
+- **Scriptable.** `--json` output and deterministic exit codes.
+
+## Install
+
+Requirements: Rust (stable) and `python3` (>= 3.8, for the bundled modules).
 
 ```bash
 cargo build --release
+install -m 755 target/release/dewey ~/.local/bin/
 ```
 
-Modules live in `~/.config/library-cli/modules/<name>/` (override with the
-`LIBRARY_CLI_MODULES` env var). Install from a directory:
+## Quick start
 
 ```bash
-library-cli install ./modules/gutenberg
-library-cli install ./modules/standard-ebooks
+dewey install ./modules/gutenberg          # install a library module
+dewey install ./modules/standard-ebooks
+
+dewey libraries                            # what's available
+dewey search "moby dick" --module gutenberg
+dewey show 2701 --module gutenberg
+dewey download 2701 --format epub --module gutenberg -o ~/Downloads
 ```
 
 ## Usage
 
-```bash
-library-cli libraries                     # list available libraries
-library-cli search "moby dick" --module gutenberg
-library-cli categories --module standard-ebooks
-library-cli list --category <feed-url> --module standard-ebooks
-library-cli show 2701 --module gutenberg
-library-cli download 2701 --format epub --module gutenberg
-library-cli download <book-id> --format epub --dir ~/Downloads
-```
+### Commands
 
-Default module and download dir go in `~/.config/library-cli/config.toml`:
+| Command | Description |
+|---|---|
+| `dewey libraries` | List available libraries and their capabilities |
+| `dewey install <dir>` | Install a module directory into the discovery path (`--force` to overwrite) |
+| `dewey search <query>` | Search a library (`--json` for machine-readable output) |
+| `dewey categories` | List browsable categories/collections of a library |
+| `dewey list --category <id>` | Browse a library's category |
+| `dewey show <book-id>` | Show details and available formats |
+| `dewey download <book-id> --format <fmt>` | Download a book in a format |
+
+### Common flags
+
+| Flag | Meaning |
+|---|---|
+| `--module <name>` | Which library to use (defaults to `default_module` in config) |
+| `--limit <n>` | Max results (1–200, default 20) |
+| `--json` | Emit normalized book records as JSON (search) |
+| `-o, --dir <dir>` | Download directory (default: config `download_dir`, else `.`) |
+| `--force` | Overwrite an existing file or module |
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | success |
+| 1 | usage error (unknown module, empty query, bad flags) |
+| 2 | module/protocol error |
+| 3 | network/IO error (download failures) |
+| 4 | config/discovery error |
+
+## Configuration
+
+`~/.config/dewey/config.toml`:
 
 ```toml
 default_module = "gutenberg"
 download_dir = "~/Downloads"
 ```
 
-## Module contract (short version)
+Environment variables:
 
-- Manifest `manifest.toml` in a module dir: `name` (== dir name), `version`,
-  `command` (argv; first element resolved relative to the dir if it names a
-  file there), `capabilities` (subset of `search`, `categories`, `list`,
-  `book`).
-- One JSON-RPC 2.0 request object per line on stdin; one response object per
-  line on stdout; exit 0. Nothing else on stdout (log to stderr).
-- Methods: `search {query, page?, limit?}` → `{books, total?}`;
-  `categories` → `{categories: [{id, title}]}`;
-  `list {category, page?, limit?}` → `{books, total?}`;
-  `book {id}` → `{book}`.
-- Book: `{id, title, authors[], languages[], published?, description?,
-  categories[], formats: [{format, url, size?}]}` with format tags
-  `epub azw3 mobi kepub txt html`.
-- Test a module by hand:
-  `printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"search","params":{"query":"moby dick"}}' | python3 modules/gutenberg/module.py`
-- Fixture mode: set `LIBRARY_CLI_FIXTURE=<dir>` to serve recorded responses
-  (`<method>-<slug>.json`) instead of the network.
+| Variable | Meaning |
+|---|---|
+| `DEWEY_MODULES` | Directory to scan for modules (default `~/.config/dewey/modules`) |
+| `DEWEY_FIXTURE` | Fixture directory — when set, modules answer from recorded data instead of the network |
 
-Exit codes: 0 ok, 1 usage, 2 module/protocol, 3 network/IO, 4 config/discovery.
+## Modules
+
+A module is a standalone program that translates a library's API into dewey's
+protocol. Modules live in `~/.config/dewey/modules/<name>/` and are installed
+with `dewey install`:
+
+```bash
+dewey install ./modules/gutenberg
+```
+
+`dewey libraries` shows what's installed and what each module can do.
+
+Want to add a library? The contract is small — read
+[Developing library modules](docs/module-development.md), and use the bundled
+`modules/gutenberg` and `modules/standard-ebooks` modules as working
+references.
+
+## Testing
+
+```bash
+cargo test                # unit + integration tests (hermetic, offline)
+cargo test -- --ignored   # live tests against real library APIs (network)
+```
+
+## License
+
+MIT — see [LICENSE.md](LICENSE.md).
