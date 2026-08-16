@@ -66,6 +66,6 @@ jobs:
           cd dist
           sha256sum *.tar.gz > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - run: gh release upload "$TAG" dist/*
+      - run: gh release upload "$TAG" dist/* --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

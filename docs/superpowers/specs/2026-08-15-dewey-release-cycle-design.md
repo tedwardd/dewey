@@ -60,8 +60,11 @@ Build job — matrix on native runners (no cross-compilation):
 |---|---|
 | `ubuntu-latest` | `linux-x86_64` |
 | `ubuntu-24.04-arm` | `linux-aarch64` |
-| `macos-13` | `macos-x86_64` |
 | `macos-14` | `macos-aarch64` |
+| `macos-14` (cross-compile `x86_64-apple-darwin`) | `macos-x86_64` |
+
+Intel macOS is cross-compiled on the arm64 runner (GitHub no longer
+provides reliable Intel macOS runners).
 
 Steps per job: checkout, `dtolnay/rust-toolchain@stable`,
 `Swatinem/rust-cache@v2`, `cargo build --release --locked`,

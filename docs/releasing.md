@@ -12,10 +12,12 @@ maintainer's guide.
   `CHANGELOG.md`.
 - Merging that release PR creates the `v<version>` tag and the GitHub
   Release automatically.
-- `release.yml` reacts to the created release: four native-runner jobs build
-  and package binaries for Linux x86_64, Linux aarch64, macOS x86_64, and
-  macOS aarch64, then a publish job computes `SHA256SUMS.txt` and uploads
-  everything to the release.
+- `release.yml` reacts to the created release: four jobs build and package
+  binaries for Linux x86_64, Linux aarch64, macOS aarch64, and macOS x86_64
+  (the Intel build is cross-compiled on the arm64 runner), then a publish
+  job computes `SHA256SUMS.txt` and uploads everything to the release.
+  Release builds can also be re-run manually with
+  `gh workflow run release.yml -f tag=v<version>`.
 
 ## Cutting a release
 
