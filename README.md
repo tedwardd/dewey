@@ -28,6 +28,26 @@ any library can be added by writing a module — see
 
 ## Install
 
+### Prebuilt binaries (GitHub Releases)
+
+Grab the archive for your platform from the
+[latest release](https://github.com/tedwardd/dewey/releases) and verify it
+against `SHA256SUMS.txt`:
+
+| Platform | Artifact |
+|---|---|
+| Linux x86_64 | `dewey-linux-x86_64-v<version>.tar.gz` |
+| Linux aarch64 | `dewey-linux-aarch64-v<version>.tar.gz` |
+| macOS x86_64 | `dewey-macos-x86_64-v<version>.tar.gz` |
+| macOS aarch64 | `dewey-macos-aarch64-v<version>.tar.gz` |
+
+```bash
+tar -xzf dewey-linux-x86_64-v0.1.0.tar.gz
+install -m 755 dewey-0.1.0/dewey ~/.local/bin/
+```
+
+### Build from source
+
 Requirements: Rust (stable) and `python3` (>= 3.8, for the bundled modules).
 
 ```bash
@@ -140,6 +160,9 @@ requests — they are not limited to the library APIs they claim to wrap.
 cargo test                # unit + integration tests (hermetic, offline)
 cargo test -- --ignored   # live tests against real library APIs (network)
 ```
+
+Versions, changelogs, and binaries are automated — see
+[Releasing](docs/releasing.md).
 
 ## License
 
