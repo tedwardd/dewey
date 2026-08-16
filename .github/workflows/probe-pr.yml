@@ -1,0 +1,22 @@
+name: probe-pr
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git checkout -b probe-pr-$(date +%s)
+          git commit --allow-empty -m "probe: test actions pr creation"
+          git push origin HEAD
+          gh pr create --title "probe: actions pr creation" --body "temporary probe" --head "$(git branch --show-current)" --base main
+          echo "PROBE_EXIT=$?"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
