@@ -109,6 +109,20 @@ fn download_unreachable_url_is_network_error() {
 }
 
 #[test]
+fn download_short_o_flag_parses() {
+    let tmp = std::env::temp_dir().join(format!("libcli-o-flag-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", fixtures())
+        .args(["download", "1", "--format", "epub", "--module", "fake", "-o", tmp.to_str().unwrap()])
+        .output()
+        .unwrap();
+    // -o must parse; the fake module's URL is unreachable, so the run fails
+    // with a network error (3), NOT a usage error (1, 'unexpected argument').
+    assert_eq!(out.status.code(), Some(3));
+}
+
+#[test]
 fn download_unknown_format_is_usage_error() {
     let out = bin()
         .env("LIBRARY_CLI_MODULES", fixtures())
@@ -317,6 +331,22 @@ fn gutenberg_show_against_fixtures() {
         .unwrap();
     assert!(out.status.success());
     assert!(String::from_utf8_lossy(&out.stdout).contains("Moby Dick; Or, The Whale"));
+}
+
+#[test]
+fn categories_rejected_when_module_lacks_capability() {
+    // gutenberg declares only ["search", "book"]; the host must refuse
+    // `categories` before spawning the module.
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .args(["categories", "--module", "gutenberg"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("does not support"), "got: {stderr}");
+    assert!(stderr.contains("capabilities: search, book"), "got: {stderr}");
 }
 
 fn se_fixtures() -> PathBuf {

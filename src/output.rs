@@ -84,6 +84,15 @@ pub fn render_categories(cats: &[Category]) -> String {
     out
 }
 
+/// Result count line per spec: `total`, when provided, enables "showing x of
+/// y"; when absent the host prints "n shown".
+pub fn render_count_line(total: Option<u64>, shown: usize) -> String {
+    match total {
+        Some(t) => format!("showing {shown} of {t}\n"),
+        None => format!("{shown} shown\n"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +148,11 @@ mod tests {
         let out = render_categories(&[Category { id: "c1".into(), title: "New Releases".into() }]);
         assert!(out.contains("New Releases - c1"));
         assert_eq!(render_categories(&[]), "no categories\n");
+    }
+
+    #[test]
+    fn count_line_shows_total_when_present() {
+        assert_eq!(render_count_line(Some(42), 20), "showing 20 of 42\n");
+        assert_eq!(render_count_line(None, 20), "20 shown\n");
     }
 }

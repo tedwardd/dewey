@@ -5,6 +5,7 @@ Speaks JSON-RPC 2.0 (one JSON object per line) over stdio.
 When LIBRARY_CLI_FIXTURE is set, answers from recorded gutendex JSON files
 (<fixture>/search-<slug>.json, <fixture>/book-<id>.json) instead of the network.
 """
+import http.client
 import json
 import os
 import re
@@ -53,8 +54,11 @@ def load(method, key, url):
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"gutendex http {e.code}: {url}") from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"gutendex network error: {e.reason}") from e
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
+        # Body-read failures (socket.timeout/TimeoutError, ConnectionResetError,
+        # http.client.IncompleteRead) are OSError/HTTPException subclasses; map
+        # them to a JSON-RPC error so the module never tracebacks.
+        raise RuntimeError(f"gutendex network error: {e}") from e
 
 
 def to_book(g):

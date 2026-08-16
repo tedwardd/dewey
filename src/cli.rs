@@ -59,7 +59,7 @@ pub enum Command {
         #[arg(long)]
         module: Option<String>,
         /// Destination directory (default: config download_dir or .)
-        #[arg(short, long)]
+        #[arg(short = 'o', long)]
         dir: Option<PathBuf>,
         /// Overwrite an existing file
         #[arg(long)]

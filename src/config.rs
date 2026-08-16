@@ -57,6 +57,12 @@ pub fn load_config_from(dir: &Path) -> Result<Config, CliError> {
 }
 
 pub fn expand_tilde(s: &str) -> String {
+    if s == "~" {
+        if let Ok(home) = std::env::var("HOME") {
+            return home;
+        }
+        return s.to_string();
+    }
     if let Some(rest) = s.strip_prefix("~/") {
         if let Ok(home) = std::env::var("HOME") {
             return format!("{home}/{rest}");
@@ -123,6 +129,7 @@ mod tests {
     #[test]
     fn expand_tilde_replaces_home() {
         let home = std::env::var("HOME").unwrap();
+        assert_eq!(expand_tilde("~"), home);
         assert_eq!(expand_tilde("~/x"), format!("{home}/x"));
         assert_eq!(expand_tilde("/abs/path"), "/abs/path");
         assert_eq!(expand_tilde("relative"), "relative");

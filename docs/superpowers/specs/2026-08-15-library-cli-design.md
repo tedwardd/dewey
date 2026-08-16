@@ -183,8 +183,9 @@ library-cli download <book-id> --format F [--module m] [-o DIR] [--force]
 - Output: aligned table (title, author, id, formats) by default; `--json`
   emits the normalized Book records for scripting.
 - `download`: resolves the format's URL from the displayed/specified Book,
-  fetches with a progress bar, single retry on transient network failure
-  (HTTP 5xx, connection reset), writes to `-o`/`download_dir` (default `.`).
+  fetches with a progress bar, 60 s overall timeout, single retry on
+  transient network failure (HTTP 5xx, connection reset), writes to
+  `-o`/`download_dir` (default `.`).
   Filename: `Title - Author.ext` (or `Title.ext` when the book has no
   authors), where `Author` is `authors` joined with `, ` and `.ext` derives
   from the format tag; sanitized (characters illegal on common filesystems

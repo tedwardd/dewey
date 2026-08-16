@@ -3,10 +3,11 @@ use crate::errors::CliError;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::fs::{self, File};
 use std::io::{IsTerminal, Read, Write};
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::thread;
 use std::time::Duration;
+
+/// Overall timeout for a single download attempt (connect + body).
+pub const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub fn sanitize_component(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -58,7 +59,10 @@ enum FetchError {
 }
 
 fn fetch_once(url: &str, dest: &Path) -> Result<u64, FetchError> {
-    let resp = ureq::get(url).call().map_err(|e| match e {
+    let resp = ureq::get(url)
+        .timeout(DOWNLOAD_TIMEOUT)
+        .call()
+        .map_err(|e| match e {
         ureq::Error::Status(code, _) => FetchError::Status(code),
         ureq::Error::Transport(t) => FetchError::Transport(t.to_string()),
     })?;
@@ -135,6 +139,8 @@ pub fn fetch_to_file(url: &str, dest: &Path) -> Result<u64, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::TcpListener;
+    use std::thread;
 
     fn temp_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!(

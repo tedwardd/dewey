@@ -41,6 +41,7 @@ fn run(cli: cli::Cli) -> Result<(), CliError> {
             }
             let limit = validate_limit(limit)?;
             let entry = resolve(&entries, module, &cfg)?;
+            require_capability(entry, "search")?;
             let host = host_for(entry);
             let result = host.call("search", json!({"query": query, "limit": limit}), 1)?;
             let resp: book::BooksResponse = serde_json::from_value(result)?;
@@ -48,10 +49,12 @@ fn run(cli: cli::Cli) -> Result<(), CliError> {
                 print!("{}", output::render_books_json(&resp.books));
             } else {
                 print!("{}", output::render_books_table(&resp.books));
+                print!("{}", output::render_count_line(resp.total, resp.books.len()));
             }
         }
         cli::Command::Categories { module } => {
             let entry = resolve(&entries, module, &cfg)?;
+            require_capability(entry, "categories")?;
             let host = host_for(entry);
             let result = host.call("categories", json!({}), 1)?;
             let resp: book::CategoriesResponse = serde_json::from_value(result)?;
@@ -63,13 +66,16 @@ fn run(cli: cli::Cli) -> Result<(), CliError> {
             }
             let limit = validate_limit(limit)?;
             let entry = resolve(&entries, module, &cfg)?;
+            require_capability(entry, "list")?;
             let host = host_for(entry);
             let result = host.call("list", json!({"category": category, "limit": limit}), 1)?;
             let resp: book::BooksResponse = serde_json::from_value(result)?;
             print!("{}", output::render_books_table(&resp.books));
+            print!("{}", output::render_count_line(resp.total, resp.books.len()));
         }
         cli::Command::Show { book_id, module } => {
             let entry = resolve(&entries, module, &cfg)?;
+            require_capability(entry, "book")?;
             let host = host_for(entry);
             let result = host.call("book", json!({"id": book_id}), 1)?;
             let resp: book::BookResponse = serde_json::from_value(result)?;
@@ -77,6 +83,7 @@ fn run(cli: cli::Cli) -> Result<(), CliError> {
         }
         cli::Command::Download { book_id, format, module, dir, force } => {
             let entry = resolve(&entries, module, &cfg)?;
+            require_capability(entry, "book")?;
             let host = host_for(entry);
             let result = host.call("book", json!({"id": book_id}), 1)?;
             let resp: book::BookResponse = serde_json::from_value(result)?;
@@ -138,6 +145,25 @@ fn resolve<'a>(
 fn host_for(entry: &discovery::ModuleEntry) -> module::ModuleHost {
     let m = entry.manifest.as_ref().expect("resolve_module guarantees manifest");
     module::ModuleHost::new(entry.name.clone(), &m.command, entry.dir.clone())
+}
+
+/// The host only surfaces verbs backed by a declared capability: refuse to
+/// call a module for a method it does not advertise.
+fn require_capability(entry: &discovery::ModuleEntry, method: &str) -> Result<(), CliError> {
+    let m = entry.manifest.as_ref().expect("resolve_module guarantees manifest");
+    if m.capabilities.iter().any(|c| c == method) {
+        Ok(())
+    } else {
+        let caps = if m.capabilities.is_empty() {
+            "(none)".to_string()
+        } else {
+            m.capabilities.join(", ")
+        };
+        Err(CliError::Usage(format!(
+            "module {} does not support {method} (capabilities: {caps})",
+            entry.name
+        )))
+    }
 }
 
 fn print_entries(entries: &[discovery::ModuleEntry]) {

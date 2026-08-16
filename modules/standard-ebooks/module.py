@@ -6,6 +6,7 @@ When LIBRARY_CLI_FIXTURE is set, answers from recorded files
 (<fixture>/<method>-<slug>.json) instead of the network.
 """
 import html.parser
+import http.client
 import json
 import os
 import re
@@ -62,8 +63,16 @@ def fixture_path(method, key):
 
 def http_bytes(url, accept=None):
     req = urllib.request.Request(url, headers={"Accept": accept} if accept else {})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"standard-ebooks http {e.code}: {url}") from e
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
+        # Body-read failures (socket.timeout/TimeoutError, ConnectionResetError,
+        # http.client.IncompleteRead) are OSError/HTTPException subclasses; map
+        # them to a JSON-RPC error so the module never tracebacks.
+        raise RuntimeError(f"standard-ebooks network error: {e}") from e
 
 
 def load_xml(method, key, url):
@@ -73,12 +82,7 @@ def load_xml(method, key, url):
             raise RuntimeError(f"fixture not found: {path}")
         with open(path, "rb") as f:
             return ET.fromstring(f.read())
-    try:
-        return ET.fromstring(http_bytes(url, "application/atom+xml"))
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"standard-ebooks http {e.code}: {url}") from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"standard-ebooks network error: {e.reason}") from e
+    return ET.fromstring(http_bytes(url, "application/atom+xml"))
 
 
 def text_of(parent, tag):
@@ -188,12 +192,7 @@ def book(params):
         with open(path, "rb") as f:
             raw = f.read()
     else:
-        try:
-            raw = http_bytes(bid, "application/atom+xml")
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"standard-ebooks http {e.code}: {bid}") from e
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"standard-ebooks network error: {e.reason}") from e
+        raw = http_bytes(bid, "application/atom+xml")
     if b"<entry" in raw:
         feed = ET.fromstring(raw)
         entries = feed.findall(ATOM + "entry")
