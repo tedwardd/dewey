@@ -3,9 +3,17 @@ name: release
 on:
   release:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach artifacts to (e.g. v0.1.0)
+        required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
   build:
@@ -18,17 +26,28 @@ jobs:
             artifact: linux-x86_64
           - os: ubuntu-24.04-arm
             artifact: linux-aarch64
-          - os: macos-13
-            artifact: macos-x86_64
           - os: macos-14
             artifact: macos-aarch64
+          # Intel macOS is cross-compiled on the arm64 runner; GitHub no
+          # longer provides reliable Intel macOS runners.
+          - os: macos-14
+            artifact: macos-x86_64
+            target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
-      - run: ./scripts/package.sh "${{ github.event.release.tag_name }}" "${{ matrix.artifact }}" target/release/dewey dist/
+        if: matrix.target == ''
+      - name: Cross-compile ${{ matrix.target }}
+        run: |
+          rustup target add "${{ matrix.target }}"
+          cargo build --release --locked --target "${{ matrix.target }}"
+          mkdir -p target/release
+          cp "target/${{ matrix.target }}/release/dewey" target/release/dewey
+        if: matrix.target != ''
+      - run: ./scripts/package.sh "$TAG" "${{ matrix.artifact }}" target/release/dewey dist/
       - uses: actions/upload-artifact@v4
         with:
           name: dewey-${{ matrix.artifact }}
@@ -47,6 +66,6 @@ jobs:
           cd dist
           sha256sum *.tar.gz > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - run: gh release upload "${{ github.event.release.tag_name }}" dist/*
+      - run: gh release upload "$TAG" dist/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
