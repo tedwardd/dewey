@@ -13,6 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
+          git config user.email "probe@example.com"
+          git config user.name "probe"
           git checkout -b probe-pr-$(date +%s)
           git commit --allow-empty -m "probe: test actions pr creation"
           git push origin HEAD
