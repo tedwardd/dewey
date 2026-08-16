@@ -1,0 +1,25 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 2701,
+      "title": "Moby Dick; Or, The Whale",
+      "authors": [{"name": "Melville, Herman"}],
+      "translators": [],
+      "subjects": ["Whaling -- Fiction", "Sea stories", "Psychological fiction"],
+      "bookshelves": ["Best Books Ever Listing"],
+      "languages": ["en"],
+      "copyright": false,
+      "media_type": "Text",
+      "formats": {
+        "text/plain; charset=us-ascii": "https://www.gutenberg.org/ebooks/2701.txt.utf-8",
+        "application/epub+zip": "https://www.gutenberg.org/ebooks/2701.epub.noimages",
+        "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/2701.kf8.images",
+        "text/html; charset=utf-8": "https://www.gutenberg.org/ebooks/2701-h/2701-h.htm"
+      },
+      "download_count": 32000
+    }
+  ]
+}

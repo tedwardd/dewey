@@ -261,3 +261,60 @@ fn version_exits_zero() {
     let out = bin().arg("--version").output().unwrap();
     assert!(out.status.success());
 }
+
+fn repo_modules() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("modules")
+}
+
+fn gutenberg_fixtures() -> PathBuf {
+    repo_modules().join("gutenberg").join("fixtures")
+}
+
+#[test]
+fn gutenberg_search_json_against_fixtures() {
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .args(["search", "moby dick", "--module", "gutenberg", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let book = &parsed[0];
+    assert_eq!(book["title"], "Moby Dick; Or, The Whale");
+    assert_eq!(book["id"], "2701");
+    let formats: Vec<String> = book["formats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["format"].as_str().unwrap().to_string())
+        .collect();
+    assert!(formats.contains(&"epub".to_string()), "got: {formats:?}");
+    assert!(formats.contains(&"txt".to_string()), "got: {formats:?}");
+}
+
+#[test]
+fn gutenberg_search_table_against_fixtures() {
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .args(["search", "moby dick", "--module", "gutenberg"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("Moby Dick; Or, The Whale"), "got: {text}");
+    assert!(text.contains("2701"), "got: {text}");
+}
+
+#[test]
+fn gutenberg_show_against_fixtures() {
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", repo_modules())
+        .env("LIBRARY_CLI_FIXTURE", gutenberg_fixtures())
+        .args(["show", "2701", "--module", "gutenberg"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Moby Dick; Or, The Whale"));
+}

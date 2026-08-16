@@ -1,0 +1,5 @@
+name = "gutenberg"
+version = "0.1.0"
+description = "Project Gutenberg via gutendex"
+command = ["python3", "module.py"]
+capabilities = ["search", "book"]
