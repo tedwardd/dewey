@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
+  <title>Standard Ebooks</title>
+  <id>https://standardebooks.org/feeds/opds/all</id>
+  <updated>2026-01-01T00:00:00Z</updated>
+  <entry>
+    <title>New Releases</title>
+    <id>https://standardebooks.org/feeds/opds/new-releases</id>
+    <updated>2026-01-01T00:00:00Z</updated>
+    <link rel="subsection" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="https://standardebooks.org/feeds/opds/new-releases"/>
+  </entry>
+  <entry>
+    <title>Science Fiction</title>
+    <id>https://standardebooks.org/feeds/opds/science-fiction</id>
+    <updated>2026-01-01T00:00:00Z</updated>
+    <link rel="subsection" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="https://standardebooks.org/feeds/opds/science-fiction"/>
+  </entry>
+</feed>

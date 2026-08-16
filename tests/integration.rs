@@ -318,3 +318,61 @@ fn gutenberg_show_against_fixtures() {
     assert!(out.status.success());
     assert!(String::from_utf8_lossy(&out.stdout).contains("Moby Dick; Or, The Whale"));
 }
+
+fn se_fixtures() -> PathBuf {
+    repo_modules().join("standard-ebooks").join("fixtures")
+}
+
+fn se_bin() -> Command {
+    let mut c = bin();
+    c.env("LIBRARY_CLI_MODULES", repo_modules());
+    c.env("LIBRARY_CLI_FIXTURE", se_fixtures());
+    c
+}
+
+#[test]
+fn standard_ebooks_categories() {
+    let out = se_bin().args(["categories", "--module", "standard-ebooks"]).output().unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("New Releases"), "got: {text}");
+    assert!(text.contains("Science Fiction"), "got: {text}");
+}
+
+#[test]
+fn standard_ebooks_list_category() {
+    let out = se_bin()
+        .args(["list", "--category", "https://standardebooks.org/feeds/opds/new-releases", "--module", "standard-ebooks"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("Frankenstein; Or, The Modern Prometheus"), "got: {text}");
+    assert!(text.contains("Mary Wollstonecraft Shelley"), "got: {text}");
+}
+
+#[test]
+fn standard_ebooks_search() {
+    let out = se_bin()
+        .args(["search", "moby dick", "--module", "standard-ebooks", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(parsed[0]["title"], "Moby Dick");
+    let formats: Vec<String> = parsed[0]["formats"].as_array().unwrap().iter()
+        .map(|f| f["format"].as_str().unwrap().to_string()).collect();
+    assert!(formats.contains(&"azw3".to_string()), "got: {formats:?}");
+}
+
+#[test]
+fn standard_ebooks_show_book() {
+    let out = se_bin()
+        .args(["show", "https://standardebooks.org/ebooks/mary-shelley/frankenstein", "--module", "standard-ebooks"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("Mary Wollstonecraft Shelley"), "got: {text}");
+    assert!(text.contains("kepub"), "got: {text}");
+}

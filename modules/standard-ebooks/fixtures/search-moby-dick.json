@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <id>https://standardebooks.org/feeds/opds/all?query=moby+dick&amp;per-page=20&amp;page=1</id>
+  <title>Search results</title>
+  <updated>2026-08-15T00:00:00Z</updated>
+  <entry>
+    <id>https://standardebooks.org/ebooks/herman-melville/moby-dick</id>
+    <title>Moby Dick</title>
+    <author>
+      <name>Herman Melville</name>
+    </author>
+    <published>2018-03-27T22:02:30Z</published>
+    <dc:issued>2018-03-27T22:02:30Z</dc:issued>
+    <updated>2026-08-04T14:52:50Z</updated>
+    <dc:language>en-US</dc:language>
+    <summary type="text">Captain Ahab, having lost his leg to the white whale Moby Dick, travels the world on a quest for vengeance.</summary>
+    <category term="Fiction"/>
+    <link href="https://standardebooks.org/ebooks/herman-melville/moby-dick" rel="alternate" title="This ebook's page at Standard Ebooks" type="application/xhtml+xml"/>
+    <link href="https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.epub?source=feed" rel="http://opds-spec.org/acquisition/open-access" title="Recommended compatible epub" type="application/epub+zip"/>
+    <link href="https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.kepub.epub?source=feed" rel="http://opds-spec.org/acquisition/open-access" title="Kobo Kepub epub" type="application/kepub+zip"/>
+    <link href="https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.azw3?source=feed" rel="http://opds-spec.org/acquisition/open-access" title="Amazon Kindle azw3" type="application/x-mobipocket-ebook"/>
+  </entry>
+</feed>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <id>https://standardebooks.org/feeds/opds/new-releases</id>
+  <title>New Releases</title>
+  <updated>2026-08-15T00:00:00Z</updated>
+  <entry>
+    <id>https://standardebooks.org/ebooks/mary-shelley/frankenstein</id>
+    <title>Frankenstein; Or, The Modern Prometheus</title>
+    <author>
+      <name>Mary Wollstonecraft Shelley</name>
+    </author>
+    <published>2015-06-29T22:02:30Z</published>
+    <dc:issued>2015-06-29T22:02:30Z</dc:issued>
+    <updated>2026-08-15T00:00:00Z</updated>
+    <dc:language>en-US</dc:language>
+    <summary type="text">A scientist's quest to create life goes horribly wrong.</summary>
+    <category term="Science Fiction"/>
+    <link href="https://standardebooks.org/ebooks/mary-shelley/frankenstein" rel="alternate" title="This ebook's page at Standard Ebooks" type="application/xhtml+xml"/>
+    <link href="https://standardebooks.org/ebooks/mary-shelley/frankenstein/downloads/mary-shelley_frankenstein.epub" rel="http://opds-spec.org/acquisition/open-access" title="Recommended compatible epub" type="application/epub+zip"/>
+    <link href="https://standardebooks.org/ebooks/mary-shelley/frankenstein/downloads/mary-shelley_frankenstein.kepub.epub" rel="http://opds-spec.org/acquisition/open-access" title="Kobo Kepub epub" type="application/kepub+zip"/>
+    <link href="https://standardebooks.org/ebooks/mary-shelley/frankenstein/downloads/mary-shelley_frankenstein.azw3" rel="http://opds-spec.org/acquisition/open-access" title="Amazon Kindle azw3" type="application/x-mobipocket-ebook"/>
+  </entry>
+</feed>

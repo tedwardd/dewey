@@ -1,0 +1,5 @@
+name = "standard-ebooks"
+version = "0.1.0"
+description = "Standard Ebooks via OPDS catalog"
+command = ["python3", "module.py"]
+capabilities = ["search", "categories", "list", "book"]
