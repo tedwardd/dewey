@@ -1,0 +1,192 @@
+# .github/workflows/aur.yml
+name: Update AUR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to sync (e.g. 0.1.0)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  aur-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: ver
+        run: echo "version=$(echo '${{ github.event.release.tag_name || inputs.version }}' | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute source tarball checksum
+        id: sums
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          SHA=$(curl -sL "https://github.com/tedwardd/dewey/archive/refs/tags/v${VERSION}.tar.gz" \
+            | sha256sum | awk '{print $1}')
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Patch PKGBUILD
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.sums.outputs.sha }}
+        run: |
+          cd packaging/aur/dewey
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${SHA}')/" PKGBUILD
+
+      - name: Regenerate .SRCINFO
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.sums.outputs.sha }}
+        run: |
+          printf 'pkgbase = dewey\n' > packaging/aur/dewey/.SRCINFO
+          printf '\tpkgdesc = Command-line framework for open ebook libraries\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tpkgver = %s\n' "${VERSION}" >> packaging/aur/dewey/.SRCINFO
+          printf '\tpkgrel = 1\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\turl = https://github.com/tedwardd/dewey\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tinstall = dewey.install\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tarch = x86_64\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tarch = aarch64\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tlicense = MIT\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tmakedepends = cargo\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tmakedepends = python\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tprovides = dewey\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tconflicts = dewey-bin\n' >> packaging/aur/dewey/.SRCINFO
+          printf '\tsource = dewey-%s.tar.gz::https://github.com/tedwardd/dewey/archive/refs/tags/v%s.tar.gz\n' "${VERSION}" "${VERSION}" >> packaging/aur/dewey/.SRCINFO
+          printf '\tsha256sums = %s\n' "${SHA}" >> packaging/aur/dewey/.SRCINFO
+          printf '\n' >> packaging/aur/dewey/.SRCINFO
+          printf 'pkgname = dewey\n' >> packaging/aur/dewey/.SRCINFO
+
+      - name: Push to AUR
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          GIT_AUTHOR_NAME: ${{ vars.AUR_USERNAME }}
+          GIT_AUTHOR_EMAIL: ${{ vars.AUR_EMAIL }}
+          GIT_COMMITTER_NAME: ${{ vars.AUR_USERNAME }}
+          GIT_COMMITTER_EMAIL: ${{ vars.AUR_EMAIL }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${AUR_SSH_KEY}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+
+          printf 'Host aur.archlinux.org\n\tUser aur\n\tIdentityFile ~/.ssh/aur\n' >> ~/.ssh/config
+
+          # Clone existing repo; if the package has never been submitted to the AUR
+          # the clone will fail — fall back to a fresh repo so the first push creates it.
+          git clone ssh://aur@aur.archlinux.org/dewey.git /tmp/aur-source \
+            || (mkdir -p /tmp/aur-source && cd /tmp/aur-source \
+                && git init \
+                && git remote add origin ssh://aur@aur.archlinux.org/dewey.git)
+          cp packaging/aur/dewey/PKGBUILD /tmp/aur-source/
+          cp packaging/aur/dewey/.SRCINFO /tmp/aur-source/
+          cp packaging/aur/dewey/dewey.install /tmp/aur-source/
+          cd /tmp/aur-source
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update to v${VERSION}"
+          git push origin HEAD:master
+
+  aur-bin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: ver
+        run: echo "version=$(echo '${{ github.event.release.tag_name || inputs.version }}' | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute binary checksums
+        id: sums
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          BASE="https://github.com/tedwardd/dewey/releases/download/v${VERSION}"
+          # Binaries are attached by release.yml; wait for them before failing.
+          for i in $(seq 1 20); do
+            SHA_AMD64=$(curl -sfL "${BASE}/dewey-linux-x86_64-v${VERSION}.tar.gz" | sha256sum | awk '{print $1}') && break
+            sleep 15
+          done
+          [ -n "${SHA_AMD64}" ] || { echo "x86_64 artifact unavailable after retries" >&2; exit 1; }
+          for i in $(seq 1 20); do
+            SHA_ARM64=$(curl -sfL "${BASE}/dewey-linux-aarch64-v${VERSION}.tar.gz" | sha256sum | awk '{print $1}') && break
+            sleep 15
+          done
+          [ -n "${SHA_ARM64}" ] || { echo "aarch64 artifact unavailable after retries" >&2; exit 1; }
+          echo "sha_amd64=${SHA_AMD64}" >> "$GITHUB_OUTPUT"
+          echo "sha_arm64=${SHA_ARM64}" >> "$GITHUB_OUTPUT"
+
+      - name: Patch PKGBUILD
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA_AMD64: ${{ steps.sums.outputs.sha_amd64 }}
+          SHA_ARM64: ${{ steps.sums.outputs.sha_arm64 }}
+        run: |
+          cd packaging/aur/dewey-bin
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${SHA_AMD64}')/" PKGBUILD
+          sed -i "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('${SHA_ARM64}')/" PKGBUILD
+
+      - name: Regenerate .SRCINFO
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA_AMD64: ${{ steps.sums.outputs.sha_amd64 }}
+          SHA_ARM64: ${{ steps.sums.outputs.sha_arm64 }}
+        run: |
+          printf 'pkgbase = dewey-bin\n' > packaging/aur/dewey-bin/.SRCINFO
+          printf '\tpkgdesc = Command-line framework for open ebook libraries (pre-built binary)\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tpkgver = %s\n' "${VERSION}" >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tpkgrel = 1\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\turl = https://github.com/tedwardd/dewey\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tinstall = dewey.install\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tarch = x86_64\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tarch = aarch64\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tlicense = MIT\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tdepends = python\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tprovides = dewey\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tconflicts = dewey\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tsource_x86_64 = dewey-%s-x86_64.tar.gz::https://github.com/tedwardd/dewey/releases/download/v%s/dewey-linux-x86_64-v%s.tar.gz\n' "${VERSION}" "${VERSION}" "${VERSION}" >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tsha256sums_x86_64 = %s\n' "${SHA_AMD64}" >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tsource_aarch64 = dewey-%s-aarch64.tar.gz::https://github.com/tedwardd/dewey/releases/download/v%s/dewey-linux-aarch64-v%s.tar.gz\n' "${VERSION}" "${VERSION}" "${VERSION}" >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\tsha256sums_aarch64 = %s\n' "${SHA_ARM64}" >> packaging/aur/dewey-bin/.SRCINFO
+          printf '\n' >> packaging/aur/dewey-bin/.SRCINFO
+          printf 'pkgname = dewey-bin\n' >> packaging/aur/dewey-bin/.SRCINFO
+
+      - name: Push to AUR
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          GIT_AUTHOR_NAME: ${{ vars.AUR_USERNAME }}
+          GIT_AUTHOR_EMAIL: ${{ vars.AUR_EMAIL }}
+          GIT_COMMITTER_NAME: ${{ vars.AUR_USERNAME }}
+          GIT_COMMITTER_EMAIL: ${{ vars.AUR_EMAIL }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${AUR_SSH_KEY}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+
+          printf 'Host aur.archlinux.org\n\tUser aur\n\tIdentityFile ~/.ssh/aur\n' >> ~/.ssh/config
+
+          # Clone existing repo; if the package has never been submitted to the AUR
+          # the clone will fail — fall back to a fresh repo so the first push creates it.
+          git clone ssh://aur@aur.archlinux.org/dewey-bin.git /tmp/aur-bin \
+            || (mkdir -p /tmp/aur-bin && cd /tmp/aur-bin \
+                && git init \
+                && git remote add origin ssh://aur@aur.archlinux.org/dewey-bin.git)
+          cp packaging/aur/dewey-bin/PKGBUILD /tmp/aur-bin/
+          cp packaging/aur/dewey-bin/.SRCINFO /tmp/aur-bin/
+          cp packaging/aur/dewey-bin/dewey.install /tmp/aur-bin/
+          cd /tmp/aur-bin
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update to v${VERSION}"
+          git push origin HEAD:master

@@ -55,6 +55,15 @@ cargo build --release
 install -m 755 target/release/dewey ~/.local/bin/
 ```
 
+### Arch Linux (AUR)
+
+Maintained by this project:
+
+```bash
+paru -S dewey        # build from source
+paru -S dewey-bin    # prebuilt binary
+```
+
 ## Quick start
 
 ```bash
