@@ -1,6 +1,19 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static INSTALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn unique_target_dir() -> PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "libcli-install-{}-{}",
+        std::process::id(),
+        INSTALL_COUNTER.fetch_add(1, Ordering::SeqCst)
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
 
 /// Lazily-created temp HOME so tests never read the developer's real
 /// `$HOME/.config/library-cli/config.toml`. A real config with a
@@ -188,6 +201,52 @@ fn install_force_removes_stale_files() {
     assert!(mods_dir.join("installable/module.py").exists());
 
     let _ = std::fs::remove_dir_all(&mods_dir);
+}
+
+#[test]
+fn install_copies_module_into_discovery_path() {
+    let target = unique_target_dir();
+    let source = fixtures().join("installable");
+    let out = bin()
+        .env("LIBRARY_CLI_MODULES", &target)
+        .args(["install", source.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(target.join("installable/manifest.toml").exists());
+    assert!(target.join("installable/module.py").exists());
+    // Installed module is discoverable and runnable.
+    let search = bin()
+        .env("LIBRARY_CLI_MODULES", &target)
+        .args(["search", "x", "--module", "installable"])
+        .output()
+        .unwrap();
+    assert!(search.status.success());
+}
+
+#[test]
+fn install_refuses_overwrite_without_force() {
+    let target = unique_target_dir();
+    let source = fixtures().join("installable");
+    let first = bin()
+        .env("LIBRARY_CLI_MODULES", &target)
+        .args(["install", source.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(first.status.success());
+    let second = bin()
+        .env("LIBRARY_CLI_MODULES", &target)
+        .args(["install", source.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert_eq!(second.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&second.stderr).contains("--force"));
+    let third = bin()
+        .env("LIBRARY_CLI_MODULES", &target)
+        .args(["install", "--force", source.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(third.status.success());
 }
 
 #[test]
