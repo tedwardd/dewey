@@ -1,8 +1,10 @@
 pub mod jsonrpc;
 
 use crate::errors::CliError;
-use crate::module::jsonrpc::{decode_response, encode_request, Response};
-use serde_json::{json, Value};
+use crate::module::jsonrpc::{decode_response, encode_request};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -57,6 +59,7 @@ impl ModuleHost {
         let line = encode_request(id, method, &params);
         if let Err(e) = stdin.write_all(line.as_bytes()) {
             let _ = child.kill();
+            let _ = child.wait();
             return Err(CliError::Module(format!(
                 "module {}: failed to send request: {e}",
                 self.name
@@ -74,22 +77,23 @@ impl ModuleHost {
         });
 
         let outcome = match rx.recv_timeout(timeout) {
-            Ok(Ok(Some(line))) => {
-                let resp: Response = decode_response(line.trim_end())?;
-                if let Some(err) = resp.error {
-                    return Err(CliError::Module(format!(
-                        "module {}: {} (code {})",
-                        self.name, err.message, err.code
-                    )));
-                }
-                match resp.result {
-                    Some(value) => Ok(value),
-                    None => Err(CliError::Module(format!(
-                        "module {}: response has neither result nor error",
-                        self.name
-                    ))),
-                }
-            }
+            Ok(Ok(Some(line))) => decode_response(line.trim_end())
+                .map_err(|e| CliError::Module(format!("module protocol: {e}")))
+                .and_then(|resp| {
+                    if let Some(err) = resp.error {
+                        return Err(CliError::Module(format!(
+                            "module {}: {} (code {})",
+                            self.name, err.message, err.code
+                        )));
+                    }
+                    match resp.result {
+                        Some(value) => Ok(value),
+                        None => Err(CliError::Module(format!(
+                            "module {}: response has neither result nor error",
+                            self.name
+                        ))),
+                    }
+                }),
             Ok(Ok(None)) => Err(CliError::Module(format!(
                 "module {}: exited without a response",
                 self.name
@@ -105,14 +109,17 @@ impl ModuleHost {
             ))),
         };
 
-        let _ = handle.join();
         match outcome {
             Ok(v) => {
+                let _ = handle.join();
                 let _ = finish(child, Duration::from_secs(2));
                 Ok(v)
             }
             Err(e) => {
+                // Kill first so the blocked read_line returns EOF and the reader
+                // thread can be joined; otherwise a hung module blocks forever.
                 let _ = child.kill();
+                let _ = handle.join();
                 let _ = child.wait();
                 Err(e)
             }

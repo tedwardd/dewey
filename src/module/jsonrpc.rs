@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request {
