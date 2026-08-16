@@ -1,4 +1,5 @@
 mod book;
+mod config;
 mod errors;
 mod module;
 
