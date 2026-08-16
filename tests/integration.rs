@@ -376,3 +376,73 @@ fn standard_ebooks_show_book() {
     assert!(text.contains("Mary Wollstonecraft Shelley"), "got: {text}");
     assert!(text.contains("kepub"), "got: {text}");
 }
+
+#[test]
+fn standard_ebooks_show_book_html_fallback() {
+    let id = "https://standardebooks.org/ebooks/herman-melville/moby-dick";
+    // The book page is XHTML (no OPDS <entry>), so module.py must fall back to
+    // parsing the <a property="schema:contentUrl" class="epub|amazon|kobo">
+    // download anchors and absolutize relative hrefs against the page URL.
+    let out = se_bin()
+        .args(["show", id, "--module", "standard-ebooks"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Fallback title is the id's last path segment.
+    assert!(text.contains("moby-dick"), "got: {text}");
+    assert!(text.contains("epub"), "got: {text}");
+    // Every format URL must be absolute, and the relative href must be joined
+    // to the page URL.
+    let urls: Vec<&str> = text
+        .lines()
+        .filter_map(|l| l.trim().split_once(" - ").map(|(_, url)| url.trim()))
+        .collect();
+    assert!(!urls.is_empty(), "no format URLs in: {text}");
+    for url in &urls {
+        assert!(
+            url.starts_with("http://") || url.starts_with("https://"),
+            "format URL not absolute: {url}"
+        );
+    }
+    assert!(
+        urls.contains(&"https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.epub"),
+        "relative href not absolutized against the page URL; got: {urls:?}"
+    );
+    // The `show` renderer omits the book id, so pin the JSON-RPC contract
+    // directly: the result must echo the requested id and absolutize hrefs.
+    use std::io::Write;
+    let mut child = Command::new("python3")
+        .arg(repo_modules().join("standard-ebooks/module.py"))
+        .current_dir(repo_modules().join("standard-ebooks"))
+        .env("LIBRARY_CLI_FIXTURE", se_fixtures())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(format!("{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"book\",\"params\":{{\"id\":\"{id}\"}}}}\n").as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let book = &parsed["result"]["book"];
+    assert_eq!(book["id"], id);
+    let formats = book["formats"].as_array().unwrap();
+    assert!(!formats.is_empty(), "no formats in {book}");
+    for f in formats {
+        let url = f["url"].as_str().unwrap();
+        assert!(
+            url.starts_with("http://") || url.starts_with("https://"),
+            "format URL not absolute: {url}"
+        );
+    }
+    let epub = formats.iter().find(|f| f["format"].as_str() == Some("epub")).expect("epub format");
+    assert_eq!(
+        epub["url"],
+        "https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.epub"
+    );
+}

@@ -170,6 +170,8 @@ def book(params):
         raise RuntimeError(f"invalid book id: {bid}")
     path = fixture_path("book", key_for(bid))
     if path:
+        if not os.path.isfile(path):
+            raise RuntimeError(f"fixture not found: {path}")
         with open(path, "rb") as f:
             raw = f.read()
     else:
@@ -216,7 +218,10 @@ def main():
                 "error": {"code": -32601, "message": f"method not found: {method}"}}) + "\n")
             return
         sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}) + "\n")
-    except RuntimeError as e:
+    except (RuntimeError, ET.ParseError) as e:
+        # ParseError (a SyntaxError subclass) escapes the RuntimeError clause;
+        # malformed XML from a fixture or the network must surface as a
+        # protocol error too, never as a traceback.
         sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": req.get("id", 0),
             "error": {"code": -32000, "message": str(e)}}) + "\n")
         sys.exit(0)
