@@ -109,10 +109,30 @@ dewey install ./modules/gutenberg
 
 `dewey libraries` shows what's installed and what each module can do.
 
+**Modules are arbitrary programs that run with your privileges — only
+install trusted modules. See [Security](#security).**
+
 Want to add a library? The contract is small — read
 [Developing library modules](docs/module-development.md), and use the bundled
 `modules/gutenberg` and `modules/standard-ebooks` modules as working
 references.
+
+## Security
+
+Modules are standalone programs that dewey executes with your user's
+privileges — they are **not sandboxed**. Installing a module is equivalent
+to running the software it contains: a malicious or compromised module can
+read, modify, or delete your files, exfiltrate data, or otherwise do
+anything your user account can do. Modules can also make their own network
+requests — they are not limited to the library APIs they claim to wrap.
+
+- **Only install modules from sources you trust.** Read a module's code
+  (including the `command` in its `manifest.toml`) before installing.
+- dewey does not verify a module's authorship or integrity. Treat every
+  install the way you would treat installing any other software.
+- The bundled `modules/gutenberg` and `modules/standard-ebooks` are written
+  and reviewed in this repository; anything installed from elsewhere
+  carries the same risk as running its code directly.
 
 ## Testing
 

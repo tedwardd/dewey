@@ -11,20 +11,26 @@ Working references live in this repository: `modules/gutenberg` (JSON API,
 `search` + `book`) and `modules/standard-ebooks` (OPDS Atom with an HTML
 fallback, all four methods).
 
+> **Security warning.** A module is a complete program that dewey executes
+> with your user's privileges, without sandboxing. Malicious or compromised
+> modules can do anything your user account can do. Read
+> [Security](#security) before writing, sharing, or installing modules.
+
 ## Table of contents
 
 1. [How dewey works](#how-dewey-works)
-2. [Module layout](#module-layout)
-3. [The manifest](#the-manifest)
-4. [The protocol](#the-protocol)
-5. [Methods](#methods)
-6. [The Book record](#the-book-record)
-7. [Format tags](#format-tags)
-8. [Errors](#errors)
-9. [Fixture mode (offline development)](#fixture-mode)
-10. [Testing your module](#testing-your-module)
-11. [Walkthrough: a module from scratch](#walkthrough)
-12. [Gotchas](#gotchas)
+2. [Security](#security)
+3. [Module layout](#module-layout)
+4. [The manifest](#the-manifest)
+5. [The protocol](#the-protocol)
+6. [Methods](#methods)
+7. [The Book record](#the-book-record)
+8. [Format tags](#format-tags)
+9. [Errors](#errors)
+10. [Fixture mode (offline development)](#fixture-mode)
+11. [Testing your module](#testing-your-module)
+12. [Walkthrough: a module from scratch](#walkthrough)
+13. [Gotchas](#gotchas)
 
 ## How dewey works
 
@@ -39,6 +45,37 @@ When you run a dewey command, the host:
 That is the whole lifecycle: one spawn, one request, one response, exit. No
 session state, no keep-alive — which is what makes modules trivial to write
 and trivial to test by hand. Each verb is a separate process invocation.
+
+## Security
+
+Modules are **complete programs**, not sandboxed plugins. When you run a
+dewey command, the host spawns the module's `command` as a child process
+under your user account, and the module can do anything your user can:
+
+- read, modify, or delete any file you can;
+- make arbitrary network requests (not just to the library it claims to
+  wrap) — including exfiltrating data;
+- spawn further processes, read your environment, your `~/.ssh`, your
+  browser's stored credentials, anything.
+
+dewey does **not** verify module authorship or integrity. `dewey install`
+copies code and will happily run whatever `command` the manifest names.
+
+What this means in practice:
+
+- **Only install modules from sources you trust**, and read the module's
+  code — including its `manifest.toml` `command` — before installing.
+- **Review modules before sharing them.** If you publish a module, say
+  plainly what it does; treat it as a piece of software you are shipping.
+- **Fixture mode is a reviewing aid, not a sandbox.** `DEWEY_FIXTURE` makes
+  a well-behaved module skip the network during development, but nothing
+  prevents a hostile module from ignoring it.
+- The protocol contract in this document (one request, one response, exit 0)
+  is a *behavioral* contract. It is not an isolation boundary.
+
+The bundled `modules/gutenberg` and `modules/standard-ebooks` are written
+and reviewed in this repository. Anything else you install carries the same
+risk as running its code directly.
 
 ## Module layout
 
