@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/tedwardd/dewey/compare/v0.1.0...v0.2.0) (2026-08-16)
+
+
+### Features
+
+* add AUR packages (dewey, dewey-bin) and publish workflow ([130ae2a](https://github.com/tedwardd/dewey/commit/130ae2a97aa5e2f400ff89787c78756d31608ab5))
+
 ## 0.1.0 (2026-08-16)
 
 
