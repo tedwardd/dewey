@@ -28,7 +28,10 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          SHA=$(curl -sL "https://github.com/tedwardd/dewey/archive/refs/tags/v${VERSION}.tar.gz" \
+          set -euo pipefail
+          # pipefail: a failed curl must fail the pipeline, otherwise a missing
+          # file yields the sha256 of empty input, which passes the -n guard.
+          SHA=$(curl -sfL "https://github.com/tedwardd/dewey/archive/refs/tags/v${VERSION}.tar.gz" \
             | sha256sum | awk '{print $1}')
           echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
 
@@ -109,8 +112,11 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          set -euo pipefail
           BASE="https://github.com/tedwardd/dewey/releases/download/v${VERSION}"
           # Binaries are attached by release.yml; wait for them before failing.
+          # pipefail is required so curl's failure isn't masked by the pipe
+          # (a missing file would otherwise yield the sha256 of empty input).
           for i in $(seq 1 20); do
             SHA_AMD64=$(curl -sfL "${BASE}/dewey-linux-x86_64-v${VERSION}.tar.gz" | sha256sum | awk '{print $1}') && break
             sleep 15
