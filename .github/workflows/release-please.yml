@@ -16,3 +16,26 @@ jobs:
         with:
           release-type: rust
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      # Auto-merge the release PR once CI is green. Merging it pushes the
+      # release commit to main, which finalizes the tag + release, which
+      # triggers release.yml (binaries) and in turn the AUR sync. This is the
+      # only manual step being removed; the PR itself still exists as an
+      # auditable gate.
+      - name: Auto-merge release PR after CI passes
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+                 --head release-please--branches--main --state open \
+                 --json number -q '.[0].number')
+          [ -n "$PR" ] || { echo "no open release-please PR"; exit 0; }
+          echo "Waiting for CI on release-please PR #${PR}"
+          # Give the ci check a moment to register, then wait for it to pass.
+          for i in $(seq 1 10); do
+            gh pr checks "$PR" >/dev/null 2>&1 && break
+            sleep 5
+          done
+          gh pr checks "$PR" --watch --interval 10 >/dev/null 2>&1 \
+            || { echo "CI not green; not auto-merging:"; gh pr checks "$PR" || true; exit 1; }
+          gh pr merge "$PR" --auto --squash

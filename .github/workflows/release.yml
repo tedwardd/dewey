@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 env:
   TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -67,5 +68,13 @@ jobs:
           sha256sum *.tar.gz > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - run: gh release upload "$TAG" dist/* --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sync AUR packages
+        run: |
+          # Dispatched explicitly AFTER binaries are attached, so the AUR push
+          # can never race the release build (see the v0.2.0 poisoning: the
+          # old `release: published` trigger fired before binaries existed).
+          gh workflow run aur.yml --repo "${{ github.repository }}" -f version="${TAG#v}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
